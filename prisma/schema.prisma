@@ -1,0 +1,360 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  TEAM_LEAD
+  SENIOR_DEVELOPER
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SubmissionStatus {
+  PENDING_REVIEW
+  SENT_BACK
+  APPROVED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TeamStatus {
+  ACTIVE
+  IDLE
+  ARCHIVED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  user_id   Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  full_name String   @db.VarChar(255)
+  role      UserRole @default(EMPLOYEE)
+
+  // New Profile Fields
+  avatar     String? @db.VarChar(255)
+  department String? @db.VarChar(100)
+  position   String? @db.VarChar(100)
+  skills     Json? // String[] stored as JSON
+
+  is_active  Boolean  @default(true)
+  is_deleted Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  created_projects Project[]      @relation("ProjectCreator")
+  created_tasks    Task[]         @relation("TaskCreator")
+  assigned_tasks   Task[]         @relation("TaskAssignees") // Many-to-Many
+  submissions      Submission[]
+  reviews          Review[]
+  verified_tasks   VerifiedTask[]
+  activity_logs    ActivityLog[]
+  refresh_tokens   RefreshToken[]
+
+  // Team Relations
+  led_teams Team[]    @relation("TeamLead")
+  teams     Team[]    @relation("TeamMembers")
+  comments  Comment[]
+
+  @@index([email])
+  @@index([role])
+  @@index([is_active])
+  @@map("users")
+}
+
+model Team {
+  team_id     Int        @id @default(autoincrement())
+  name        String     @db.VarChar(255)
+  description String?    @db.Text
+  lead_id     Int
+  status      TeamStatus @default(ACTIVE)
+  avatar      String?    @db.VarChar(255)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  // Relations
+  lead     User      @relation("TeamLead", fields: [lead_id], references: [user_id])
+  members  User[]    @relation("TeamMembers")
+  projects Project[]
+
+  @@index([lead_id])
+  @@map("teams")
+}
+
+model Project {
+  project_id  Int           @id @default(autoincrement())
+  name        String        @db.VarChar(255)
+  description String?       @db.Text
+  status      ProjectStatus @default(PLANNING)
+  priority    TaskPriority? // Projects can have priority too
+
+  // Planning Fields
+  start_date DateTime?
+  end_date   DateTime?
+  progress   Int       @default(0) // 0-100
+
+  created_by Int
+  team_id    Int?
+
+  is_deleted Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  creator User    @relation("ProjectCreator", fields: [created_by], references: [user_id])
+  team    Team?   @relation(fields: [team_id], references: [team_id])
+  phases  Phase[]
+  tasks   Task[]
+  tags    Tag[]
+
+  @@index([created_by])
+  @@index([team_id])
+  @@index([created_at])
+  @@map("projects")
+}
+
+model Phase {
+  phase_id      Int     @id @default(autoincrement())
+  project_id    Int
+  name          String  @db.VarChar(255)
+  description   String? @db.Text
+  display_order Int     @default(0)
+
+  start_date DateTime?
+  end_date   DateTime?
+  status     ProjectStatus @default(PLANNING)
+
+  is_deleted Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([project_id])
+  @@index([display_order])
+  @@map("phases")
+}
+
+model Task {
+  task_id     Int     @id @default(autoincrement())
+  title       String  @db.VarChar(255)
+  description String? @db.Text
+  project_id  Int
+  phase_id    Int?
+  created_by  Int
+
+  // Planning & Tracking
+  start_date      DateTime?
+  deadline        DateTime?
+  estimated_hours Float?
+  actual_hours    Float?
+  position        Int       @default(0) // Kanban order
+
+  priority TaskPriority @default(MEDIUM)
+  status   TaskStatus   @default(TODO)
+
+  is_deleted Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project       Project       @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  phase         Phase?        @relation(fields: [phase_id], references: [phase_id], onDelete: SetNull)
+  creator       User          @relation("TaskCreator", fields: [created_by], references: [user_id])
+  assignees     User[]        @relation("TaskAssignees") // Many-to-Many
+  subtasks      SubTask[]
+  comments      Comment[]
+  tags          Tag[]
+  submissions   Submission[]
+  verified_task VerifiedTask?
+  activity_logs ActivityLog[]
+
+  @@index([project_id])
+  @@index([phase_id])
+  @@index([created_by])
+  @@index([status])
+  @@index([priority])
+  @@index([deadline])
+  @@index([created_at])
+  @@map("tasks")
+}
+
+model SubTask {
+  subtask_id   Int      @id @default(autoincrement())
+  task_id      Int
+  title        String   @db.VarChar(255)
+  is_completed Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relations
+  task Task @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+
+  @@index([task_id])
+  @@map("subtasks")
+}
+
+model Comment {
+  comment_id Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  content    String   @db.Text
+  parent_id  Int?
+  mentions   Json? // Array of user_ids strings
+  reactions  Json? // Array of { emoji: string, userIds: string[] }
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  task    Task      @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+  user    User      @relation(fields: [user_id], references: [user_id])
+  parent  Comment?  @relation("CommentReplies", fields: [parent_id], references: [comment_id], onDelete: SetNull)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([task_id])
+  @@index([user_id])
+  @@map("comments")
+}
+
+model Tag {
+  tag_id Int     @id @default(autoincrement())
+  name   String  @unique @db.VarChar(50)
+  color  String? @db.VarChar(20) // Hex code
+
+  // Relations
+  projects Project[]
+  tasks    Task[]
+
+  @@map("tags")
+}
+
+model Submission {
+  submission_id   Int              @id @default(autoincrement())
+  task_id         Int
+  submitted_by    Int
+  submission_note String?          @db.Text
+  attachments     String?          @db.Text // JSON array of file URLs
+  status          SubmissionStatus @default(PENDING_REVIEW)
+  submitted_at    DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  // Relations
+  task      Task     @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+  submitter User     @relation(fields: [submitted_by], references: [user_id])
+  reviews   Review[]
+
+  @@index([task_id])
+  @@index([submitted_by])
+  @@index([status])
+  @@index([submitted_at])
+  @@map("submissions")
+}
+
+model Review {
+  review_id     Int      @id @default(autoincrement())
+  submission_id Int
+  reviewer_id   Int
+  review_note   String?  @db.Text
+  is_approved   Boolean
+  reviewed_at   DateTime @default(now())
+
+  // Relations
+  submission Submission @relation(fields: [submission_id], references: [submission_id], onDelete: Cascade)
+  reviewer   User       @relation(fields: [reviewer_id], references: [user_id])
+
+  @@index([submission_id])
+  @@index([reviewer_id])
+  @@index([reviewed_at])
+  @@map("reviews")
+}
+
+model VerifiedTask {
+  verified_task_id Int      @id @default(autoincrement())
+  task_id          Int      @unique
+  reviewer_id      Int
+  verified_at      DateTime @default(now())
+
+  // Relations
+  task     Task @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+  reviewer User @relation(fields: [reviewer_id], references: [user_id])
+
+  @@index([reviewer_id])
+  @@index([verified_at])
+  @@map("verified_tasks")
+}
+
+model ActivityLog {
+  activity_id   Int      @id @default(autoincrement())
+  user_id       Int
+  task_id       Int?
+  activity_type String   @db.VarChar(100) // e.g., "TASK_CREATED", "TASK_ASSIGNED", "TASK_SUBMITTED", "TASK_REVIEWED"
+  description   String   @db.Text
+  metadata      String?  @db.Text // JSON for additional data
+  created_at    DateTime @default(now())
+
+  // Relations
+  user User  @relation(fields: [user_id], references: [user_id])
+  task Task? @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([task_id])
+  @@index([activity_type])
+  @@index([created_at])
+  @@map("activity_logs")
+}
+
+model RefreshToken {
+  token_id   Int      @id @default(autoincrement())
+  user_id    Int
+  token      String   @unique @db.VarChar(500)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token])
+  @@index([expires_at])
+  @@map("refresh_tokens")
+}
