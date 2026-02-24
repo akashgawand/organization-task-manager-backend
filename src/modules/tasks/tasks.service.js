@@ -120,8 +120,17 @@ const getTasks = async (query, userId, userRole) => {
         ...(query.assigned_to && {
             assignees: { some: { user_id: parseInt(query.assigned_to) } },
         }),
-        // Members only see their own tasks or tasks they created
-        ...(userRole === 'EMPLOYEE' && {
+        // Super Admins see everything (constrained by query filters).
+        // Admins see everything EXCEPT tasks created by or assigned to a Super Admin.
+        ...(userRole === 'ADMIN' && {
+            AND: [
+                { NOT: { assignees: { some: { role: 'SUPER_ADMIN' } } } },
+                { NOT: { creator: { role: 'SUPER_ADMIN' } } }
+            ]
+        }),
+        // Non-admins see only tasks assigned to them, created by them, or on their teams (in a fuller implementation)
+        // For now, retaining existing member-only visibility logic for employees/leads
+        ...((userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') && {
             OR: [
                 { assignees: { some: { user_id: userId } } },
                 { created_by: userId },

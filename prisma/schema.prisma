@@ -358,3 +358,30 @@ model RefreshToken {
   @@index([expires_at])
   @@map("refresh_tokens")
 }
+
+model SystemSettings {
+  id           Int    @id @default(1)
+  company_name String @default("Acme Corporation") @db.VarChar(255)
+  timezone     String @default("(UTC-05:00) Eastern Time (US & Canada)") @db.VarChar(100)
+  date_format  String @default("MM/DD/YYYY") @db.VarChar(50)
+  time_format  String @default("12-hour") @db.VarChar(20)
+
+  // Notifications
+  notify_task_assignments Boolean @default(true)
+  notify_task_updates     Boolean @default(true)
+  notify_comments         Boolean @default(true)
+  notify_mentions         Boolean @default(true)
+  notification_frequency  String  @default("Instant") @db.VarChar(50)
+
+  // Security
+  session_timeout        String  @default("15 minutes") @db.VarChar(50)
+  pass_min_length        Boolean @default(true)
+  pass_require_uppercase Boolean @default(true)
+  pass_require_numbers   Boolean @default(false)
+  pass_require_special   Boolean @default(false)
+  require_2fa            Boolean @default(false)
+
+  updated_at DateTime @updatedAt
+
+  @@map("system_settings")
+}

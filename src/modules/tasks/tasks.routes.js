@@ -1,7 +1,7 @@
 const express = require('express');
 const tasksController = require('./tasks.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requireManagerOrAdmin } = require('../../middleware/role.middleware');
+const { requirePermission } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     createTaskSchema,
@@ -19,7 +19,7 @@ router.use(authenticate);
 // POST /api/v1/tasks - Create task (Manager/Admin)
 router.post(
     '/',
-    requireManagerOrAdmin,
+    requirePermission('task:create'),
     validate(createTaskSchema),
     tasksController.createTask
 );
@@ -55,7 +55,7 @@ router.patch(
 // PATCH /api/v1/tasks/:id/assign - Assign task (Manager/Admin)
 router.patch(
     '/:id/assign',
-    requireManagerOrAdmin,
+    requirePermission('task:assign'),
     validate({ ...taskIdParamSchema, ...assignTaskSchema }),
     tasksController.assignTask
 );
@@ -69,7 +69,7 @@ router.post(
 // DELETE /api/v1/tasks/:id - Delete task (Manager/Admin)
 router.delete(
     '/:id',
-    requireManagerOrAdmin,
+    requirePermission('task:delete'),
     validate(taskIdParamSchema),
     tasksController.deleteTask
 );

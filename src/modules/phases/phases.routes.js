@@ -1,7 +1,7 @@
 const express = require('express');
 const phasesController = require('./phases.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requireManagerOrAdmin } = require('../../middleware/role.middleware');
+const { requirePermission } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     createPhaseSchema,
@@ -18,7 +18,7 @@ router.use(authenticate);
 // POST /api/v1/phases - Create phase (Manager/Admin)
 router.post(
     '/',
-    requireManagerOrAdmin,
+    requirePermission('phase:create'),
     validate(createPhaseSchema),
     phasesController.createPhase.bind(phasesController)
 );
@@ -33,7 +33,7 @@ router.get(
 // PUT /api/v1/phases/:id - Update phase (Manager/Admin)
 router.put(
     '/:id',
-    requireManagerOrAdmin,
+    requirePermission('phase:update'),
     validate({ ...phaseIdParamSchema, ...updatePhaseSchema }),
     phasesController.updatePhase.bind(phasesController)
 );
@@ -41,7 +41,7 @@ router.put(
 // DELETE /api/v1/phases/:id - Delete phase (Manager/Admin)
 router.delete(
     '/:id',
-    requireManagerOrAdmin,
+    requirePermission('phase:delete'),
     validate(phaseIdParamSchema),
     phasesController.deletePhase.bind(phasesController)
 );
@@ -49,7 +49,7 @@ router.delete(
 // PATCH /api/v1/phases/reorder - Reorder phases (Manager/Admin)
 router.patch(
     '/reorder',
-    requireManagerOrAdmin,
+    requirePermission('phase:update'),
     validate(reorderPhasesSchema),
     phasesController.reorderPhases.bind(phasesController)
 );

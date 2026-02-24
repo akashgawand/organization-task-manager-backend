@@ -1,7 +1,7 @@
 const express = require('express');
 const reviewsController = require('./reviews.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requireReviewer } = require('../../middleware/role.middleware');
+const { requirePermission } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     approveSubmissionSchema,
@@ -12,11 +12,12 @@ const {
 const router = express.Router();
 
 router.use(authenticate);
-router.use(requireReviewer); // All review operations require REVIEWER, MANAGER, or ADMIN role
+router.use(requirePermission('review:read')); // Baseline permission for all review operations
 
 // POST /api/v1/reviews/approve - Approve submission
 router.post(
     '/approve',
+    requirePermission('review:create'),
     validate(approveSubmissionSchema),
     reviewsController.approveSubmission.bind(reviewsController)
 );
@@ -24,6 +25,7 @@ router.post(
 // POST /api/v1/reviews/reject - Reject submission
 router.post(
     '/reject',
+    requirePermission('review:create'),
     validate(rejectSubmissionSchema),
     reviewsController.rejectSubmission.bind(reviewsController)
 );

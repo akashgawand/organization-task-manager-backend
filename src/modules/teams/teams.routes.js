@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const teamsController = require('./teams.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requireAdmin, requireManagerOrAdmin } = require('../../middleware/role.middleware');
+const { requirePermission } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const teamsValidation = require('./teams.validation');
 
@@ -12,7 +12,7 @@ router.use(authenticate);
 // Create team
 router.post(
     '/',
-    requireManagerOrAdmin,
+    requirePermission('team:create'),
     validate(teamsValidation.createTeam),
     teamsController.createTeam
 );
@@ -34,7 +34,7 @@ router.get(
 // Update team
 router.put(
     '/:id',
-    requireManagerOrAdmin,
+    requirePermission('team:update'),
     validate(teamsValidation.updateTeam),
     teamsController.updateTeam
 );
@@ -42,7 +42,7 @@ router.put(
 // Delete team
 router.delete(
     '/:id',
-    requireAdmin,
+    requirePermission('team:delete'),
     validate(teamsValidation.deleteTeam),
     teamsController.deleteTeam
 );
@@ -50,7 +50,7 @@ router.delete(
 // Add member to team
 router.post(
     '/:id/members',
-    requireManagerOrAdmin,
+    requirePermission('team:update'),
     validate(teamsValidation.addMember),
     teamsController.addMember
 );
@@ -58,7 +58,7 @@ router.post(
 // Remove member from team
 router.delete(
     '/:id/members/:user_id',
-    requireManagerOrAdmin,
+    requirePermission('team:update'),
     validate(teamsValidation.removeMember),
     teamsController.removeMember
 );

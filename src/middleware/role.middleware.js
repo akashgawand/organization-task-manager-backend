@@ -1,5 +1,27 @@
 const { errorResponse } = require('../utils/response');
-const { canAccessResource } = require('../constants/roles');
+const { canAccessResource, hasPermission } = require('../constants/roles');
+
+/**
+ * Check if user has required permission
+ * @param {string} permission - Required permission string
+ */
+const requirePermission = (permission) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return errorResponse(res, 'Authentication required', 401);
+        }
+
+        if (!hasPermission(req.user.role, permission)) {
+            return errorResponse(
+                res,
+                `Insufficient permissions. Requires: ${permission}`,
+                403
+            );
+        }
+
+        next();
+    };
+};
 
 /**
  * Check if user has required role
@@ -77,4 +99,5 @@ module.exports = {
     requireManagerOrAdmin,
     requireReviewer,
     requireOwnershipOrAdmin,
+    requirePermission,
 };
