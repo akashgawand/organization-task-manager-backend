@@ -11,6 +11,7 @@ const activityRoutes = require('../modules/activity/activity.routes');
 const teamsRoutes = require('../modules/teams/teams.routes');
 const tagsRoutes = require('../modules/tags/tags.routes');
 const settingsRoutes = require('../modules/settings/settings.routes');
+const analyticsRoutes = require('../modules/analytics/analytics.routes');
 
 const router = express.Router();
 
@@ -36,5 +37,6 @@ router.use('/reviews', reviewsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/activity', activityRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/analytics', analyticsRoutes);
 
 module.exports = router;
