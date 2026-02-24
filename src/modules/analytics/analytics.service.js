@@ -89,21 +89,33 @@ const getDashboardOverview = async () => {
  * @returns {Promise<Array>}
  */
 const getTrendData = async (startDate, endDate) => {
+    // Helper: get YYYY-MM-DD in server local time (IST)
+    const toLocalDateStr = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Default to last 14 days if not provided
-    let start = startDate ? new Date(startDate) : new Date();
-    let end = endDate ? new Date(endDate) : new Date();
+    let start = startDate ? new Date(startDate + "T00:00:00") : new Date();
+    let end = endDate ? new Date(endDate + "T23:59:59") : new Date();
 
     if (!startDate) {
+        start = new Date();
         start.setDate(end.getDate() - 13);
     }
 
+    // Set to local day boundaries
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
-    const data = [];
-    const currentDate = new Date(start);
+    const startStr = toLocalDateStr(start);
+    const endStr = toLocalDateStr(end);
 
-    // Fetch all relevant tasks within the broad window once, rather than in the loop
+    const data = [];
+
+    // Fetch all relevant tasks within the broad window
     const tasks = await prisma.task.findMany({
         where: {
             OR: [
@@ -118,24 +130,26 @@ const getTrendData = async (startDate, endDate) => {
         }
     });
 
-    while (currentDate <= end) {
-        const dateStr = currentDate.toISOString().split("T")[0];
+    // Build date range — iterate by local date
+    const currentDate = new Date(start);
+
+    while (toLocalDateStr(currentDate) <= endStr) {
+        const dateStr = toLocalDateStr(currentDate);
 
         const createdTasks = tasks.filter(t =>
-            t.created_at.toISOString().split("T")[0] === dateStr
+            toLocalDateStr(new Date(t.created_at)) === dateStr
         ).length;
 
         const completedTasks = tasks.filter(t =>
             t.status === 'DONE' &&
             t.updated_at &&
-            t.updated_at.toISOString().split("T")[0] === dateStr
+            toLocalDateStr(new Date(t.updated_at)) === dateStr
         ).length;
 
         data.push({
             date: dateStr,
             createdTasks,
             completedTasks,
-            // Mock random active users as requested by the frontend trend chart
             activeUsers: Math.floor(Math.random() * 15) + 5
         });
 
