@@ -69,7 +69,7 @@ const getTeams = async (query) => {
     const { page = 1, limit = 10, search, status } = query;
     const { skip, take } = getPaginationParams(page, limit);
 
-    const where = {};
+    const where = { is_deleted: false };
 
     if (search) {
         where.OR = [
@@ -128,8 +128,8 @@ const getTeams = async (query) => {
 };
 
 const getTeamById = async (id) => {
-    const team = await prisma.team.findUnique({
-        where: { team_id: parseInt(id) },
+    const team = await prisma.team.findFirst({
+        where: { team_id: parseInt(id), is_deleted: false },
         include: {
             lead: {
                 select: {
@@ -175,8 +175,8 @@ const getTeamById = async (id) => {
 const updateTeam = async (id, data) => {
     const { name, description, lead_id, status, avatar } = data;
 
-    const team = await prisma.team.findUnique({
-        where: { team_id: parseInt(id) },
+    const team = await prisma.team.findFirst({
+        where: { team_id: parseInt(id), is_deleted: false },
     });
 
     if (!team) {
@@ -224,22 +224,23 @@ const updateTeam = async (id, data) => {
 };
 
 const deleteTeam = async (id) => {
-    const team = await prisma.team.findUnique({
-        where: { team_id: parseInt(id) },
+    const team = await prisma.team.findFirst({
+        where: { team_id: parseInt(id), is_deleted: false },
     });
 
     if (!team) {
         throw new Error('Team not found');
     }
 
-    await prisma.team.delete({
+    await prisma.team.update({
         where: { team_id: parseInt(id) },
+        data: { is_deleted: true },
     });
 };
 
 const addMember = async (teamId, userId) => {
-    const team = await prisma.team.findUnique({
-        where: { team_id: parseInt(teamId) },
+    const team = await prisma.team.findFirst({
+        where: { team_id: parseInt(teamId), is_deleted: false },
     });
 
     if (!team) {
@@ -271,8 +272,8 @@ const addMember = async (teamId, userId) => {
 };
 
 const removeMember = async (teamId, userId) => {
-    const team = await prisma.team.findUnique({
-        where: { team_id: parseInt(teamId) },
+    const team = await prisma.team.findFirst({
+        where: { team_id: parseInt(teamId), is_deleted: false },
     });
 
     if (!team) {
