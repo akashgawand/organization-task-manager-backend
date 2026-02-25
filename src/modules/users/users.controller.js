@@ -78,10 +78,49 @@ const changeUserRole = async (req, res, next) => {
     }
 };
 
+/**
+ * Update own profile
+ */
+const updateOwnProfile = async (req, res, next) => {
+    try {
+        const user = await usersService.updateOwnProfile(req.user.user_id, req.body);
+        return successResponse(res, user, 'Profile updated successfully');
+    } catch (error) {
+        if (error.message === 'Email already in use') {
+            return errorResponse(res, error.message, 400);
+        }
+        if (error.message === 'User not found or inactive') {
+            return errorResponse(res, error.message, 404);
+        }
+        next(error);
+    }
+};
+
+/**
+ * Update password
+ */
+const updatePassword = async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        await usersService.updatePassword(req.user.user_id, currentPassword, newPassword);
+        return successResponse(res, null, 'Password updated successfully');
+    } catch (error) {
+        if (error.message === 'Incorrect current password') {
+            return errorResponse(res, error.message, 400);
+        }
+        if (error.message === 'User not found or inactive') {
+            return errorResponse(res, error.message, 404);
+        }
+        next(error);
+    }
+};
+
 module.exports = {
     getUsers,
     getUserById,
     updateUser,
     deleteUser,
     changeUserRole,
+    updateOwnProfile,
+    updatePassword,
 };

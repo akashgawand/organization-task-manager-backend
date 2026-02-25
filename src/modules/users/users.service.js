@@ -1,5 +1,6 @@
 const { getPrismaClient } = require('../../config/db');
 const { getPaginationParams, createPaginatedResponse } = require('../../utils/pagination');
+const bcrypt = require('bcryptjs');
 
 const prisma = getPrismaClient();
 
@@ -148,6 +149,71 @@ class UsersService {
         });
 
         return updatedUser;
+    }
+    /**
+     * Update own profile
+     */
+    async updateOwnProfile(userId, updateData) {
+        const user = await prisma.user.findUnique({
+            where: { user_id: parseInt(userId) },
+        });
+
+        if (!user || user.is_deleted || !user.is_active) {
+            throw new Error('User not found or inactive');
+        }
+
+        // Email uniqueness check if changing email
+        if (updateData.email && updateData.email !== user.email) {
+            const existingUser = await prisma.user.findUnique({
+                where: { email: updateData.email }
+            });
+            if (existingUser) {
+                throw new Error('Email already in use');
+            }
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { user_id: parseInt(userId) },
+            data: updateData,
+            select: {
+                user_id: true,
+                email: true,
+                full_name: true,
+                role: true,
+                is_active: true,
+                updated_at: true,
+            },
+        });
+
+        return updatedUser;
+    }
+
+    /**
+     * Update user password
+     */
+    async updatePassword(userId, currentPassword, newPassword) {
+        const user = await prisma.user.findUnique({
+            where: { user_id: parseInt(userId) },
+        });
+
+        if (!user || user.is_deleted || !user.is_active) {
+            throw new Error('User not found or inactive');
+        }
+
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isPasswordValid) {
+            throw new Error('Incorrect current password');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        await prisma.user.update({
+            where: { user_id: parseInt(userId) },
+            data: { password: hashedPassword }
+        });
+
+        return true;
     }
 }
 
