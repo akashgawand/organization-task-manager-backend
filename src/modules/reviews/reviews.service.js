@@ -138,9 +138,8 @@ class ReviewsService {
         return reviews;
     }
 
-    async getPendingReviews() {
-        const submissions = await prisma.submission.findMany({
-            where: { status: SUBMISSION_STATUS.PENDING_REVIEW },
+    async getPendingReviews(all = false) {
+        const query = {
             include: {
                 task: {
                     include: {
@@ -150,9 +149,22 @@ class ReviewsService {
                     },
                 },
                 submitter: { select: { user_id: true, full_name: true, email: true } },
+                reviews: {
+                    include: {
+                        reviewer: { select: { user_id: true, full_name: true } }
+                    },
+                    orderBy: { reviewed_at: 'desc' },
+                    take: 1
+                }
             },
-            orderBy: { submitted_at: 'asc' },
-        });
+            orderBy: { submitted_at: 'desc' },
+        };
+
+        if (!all) {
+            query.where = { status: SUBMISSION_STATUS.PENDING_REVIEW };
+        }
+
+        const submissions = await prisma.submission.findMany(query);
 
         return submissions.map(sub => ({
             ...sub,

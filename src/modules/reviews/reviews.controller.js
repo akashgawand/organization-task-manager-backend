@@ -53,8 +53,9 @@ const getReviewsBySubmission = async (req, res, next) => {
 
 const getPendingReviews = async (req, res, next) => {
     try {
-        const submissions = await reviewsService.getPendingReviews();
-        return successResponse(res, submissions, 'Pending reviews retrieved successfully');
+        const isAll = req.query.all === 'true';
+        const submissions = await reviewsService.getPendingReviews(isAll);
+        return successResponse(res, submissions, 'Reviews retrieved successfully');
     } catch (error) {
         next(error);
     }
