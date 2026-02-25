@@ -35,9 +35,35 @@ const userIdParamSchema = z.object({
     }),
 });
 
+const updateOwnProfileSchema = z.object({
+    body: z.object({
+        full_name: z
+            .string()
+            .min(2, 'Full name must be at least 2 characters')
+            .max(255, 'Full name must not exceed 255 characters')
+            .optional(),
+        email: z
+            .string()
+            .email('Invalid email format')
+            .optional(),
+        phone: z
+            .string()
+            .optional(),
+    }),
+});
+
+const updatePasswordSchema = z.object({
+    body: z.object({
+        currentPassword: z.string().min(1, 'Current password is required'),
+        newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+    }),
+});
+
 module.exports = {
     updateUserSchema,
     changeRoleSchema,
     queryUsersSchema,
     userIdParamSchema,
+    updateOwnProfileSchema,
+    updatePasswordSchema,
 };

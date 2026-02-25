@@ -8,6 +8,8 @@ const {
     changeRoleSchema,
     queryUsersSchema,
     userIdParamSchema,
+    updateOwnProfileSchema,
+    updatePasswordSchema
 } = require('./users.validation');
 
 const router = express.Router();
@@ -51,6 +53,20 @@ router.patch(
     requirePermission('user:change-role'),
     validate({ ...userIdParamSchema, ...changeRoleSchema }),
     usersController.changeUserRole
+);
+
+// PATCH /api/v1/users/profile - Update own profile
+router.patch(
+    '/profile',
+    validate(updateOwnProfileSchema),
+    usersController.updateOwnProfile
+);
+
+// PATCH /api/v1/users/password - Update own password
+router.patch(
+    '/password',
+    validate(updatePasswordSchema),
+    usersController.updatePassword
 );
 
 module.exports = router;
