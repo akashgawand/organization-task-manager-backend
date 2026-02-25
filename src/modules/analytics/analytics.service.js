@@ -98,13 +98,13 @@ const getTrendData = async (startDate, endDate) => {
     };
 
     // Default to last 14 days if not provided
-    let start = startDate ? new Date(startDate + "T00:00:00") : new Date();
-    let end = endDate ? new Date(endDate + "T23:59:59") : new Date();
+    let start = new Date();
+    let end = new Date();
 
-    if (!startDate) {
-        start = new Date();
-        start.setDate(end.getDate() - 13);
-    }
+    if (startDate) start = new Date(startDate);
+    else start.setDate(end.getDate() - 13);
+
+    if (endDate) end = new Date(endDate);
 
     // Set to local day boundaries
     start.setHours(0, 0, 0, 0);
