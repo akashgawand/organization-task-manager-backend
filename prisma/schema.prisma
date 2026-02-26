@@ -94,6 +94,10 @@ model User {
   teams     Team[]    @relation("TeamMembers")
   comments  Comment[]
 
+  // Notifications
+  notifications            Notification[]
+  notification_preferences NotificationPreference[]
+
   @@index([email])
   @@index([role])
   @@index([is_active])
@@ -385,4 +389,50 @@ model SystemSettings {
   updated_at DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+model Notification {
+  notification_id Int      @id @default(autoincrement())
+  user_id         Int
+  type            String   @db.VarChar(100) // TASK_ASSIGNED, MENTIONED, REVIEW_REQUIRED, etc.
+  title           String   @db.VarChar(255)
+  message         String   @db.Text
+  entity_type     String?  @db.VarChar(50) // TASK, PROJECT, COMMENT
+  entity_id       Int?
+  is_read         Boolean  @default(false)
+  is_deleted      Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id])
+  @@index([is_read])
+  @@index([created_at])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  preference_id Int     @id @default(autoincrement())
+  user_id       Int
+  event_type    String  @db.VarChar(100)
+  in_app        Boolean @default(true)
+  email         Boolean @default(false)
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@unique([user_id, event_type])
+  @@map("notification_preferences")
+}
+
+model NotificationQueue {
+  queue_id   Int      @id @default(autoincrement())
+  event_type String   @db.VarChar(100) // The raw action type like TASK_ASSIGNED
+  payload    Json
+  processed  Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([processed, created_at])
+  @@map("notification_queue")
 }
