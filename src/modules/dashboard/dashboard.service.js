@@ -21,10 +21,10 @@ const getAnalytics = async (dateRange) => {
     ] = await Promise.all([
         prisma.task.count({ where: { ...where, is_deleted: false } }),
         prisma.task.count({ where: { ...where, status: TASK_STATUS.IN_PROGRESS, is_deleted: false } }),
-        prisma.task.count({ where: { ...where, status: TASK_STATUS.SUBMITTED, is_deleted: false } }),
-        prisma.task.count({ where: { ...where, status: TASK_STATUS.REJECTED, is_deleted: false } }),
-        prisma.task.count({ where: { ...where, status: TASK_STATUS.VERIFIED, is_deleted: false } }),
-        prisma.task.count({ where: { ...where, status: TASK_STATUS.COMPLETED, is_deleted: false } }),
+        prisma.task.count({ where: { ...where, status: TASK_STATUS.REVIEW, is_deleted: false } }),
+        prisma.task.count({ where: { ...where, status: TASK_STATUS.BLOCKED, is_deleted: false } }),
+        prisma.task.count({ where: { ...where, status: TASK_STATUS.DONE, is_deleted: false } }),
+        prisma.task.count({ where: { ...where, status: TASK_STATUS.DONE, is_deleted: false } }),
     ]);
 
     return {
@@ -42,15 +42,15 @@ const getEmployeeProductivity = async (userId) => {
     const [tasksCompleted, tasksPending, submissions, reviews] = await Promise.all([
         prisma.task.count({
             where: {
-                assigned_to: userId,
-                status: { in: [TASK_STATUS.VERIFIED, TASK_STATUS.COMPLETED] },
+                assignees: { some: { user_id: userId } },
+                status: { in: [TASK_STATUS.REVIEW, TASK_STATUS.DONE] },
                 is_deleted: false,
             },
         }),
         prisma.task.count({
             where: {
-                assigned_to: userId,
-                status: { notIn: [TASK_STATUS.VERIFIED, TASK_STATUS.COMPLETED] },
+                assignees: { some: { user_id: userId } },
+                status: { notIn: [TASK_STATUS.REVIEW, TASK_STATUS.DONE] },
                 is_deleted: false,
             },
         }),
@@ -93,14 +93,14 @@ const getProjectStats = async (projectId) => {
     if (!project || project.is_deleted) throw new Error('Project not found');
 
     const statusBreakdown = {
-        created: project.tasks.filter(t => t.status === TASK_STATUS.CREATED).length,
-        assigned: project.tasks.filter(t => t.status === TASK_STATUS.ASSIGNED).length,
+        created: project.tasks.filter(t => t.status === TASK_STATUS.TODO).length,
+        assigned: project.tasks.filter(t => t.status === TASK_STATUS.TODO).length,
         inProgress: project.tasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length,
-        submitted: project.tasks.filter(t => t.status === TASK_STATUS.SUBMITTED).length,
-        underReview: project.tasks.filter(t => t.status === TASK_STATUS.UNDER_REVIEW).length,
-        rejected: project.tasks.filter(t => t.status === TASK_STATUS.REJECTED).length,
-        verified: project.tasks.filter(t => t.status === TASK_STATUS.VERIFIED).length,
-        completed: project.tasks.filter(t => t.status === TASK_STATUS.COMPLETED).length,
+        submitted: project.tasks.filter(t => t.status === TASK_STATUS.REVIEW).length,
+        underReview: project.tasks.filter(t => t.status === TASK_STATUS.REVIEW).length,
+        rejected: project.tasks.filter(t => t.status === TASK_STATUS.BLOCKED).length,
+        verified: project.tasks.filter(t => t.status === TASK_STATUS.DONE).length,
+        completed: project.tasks.filter(t => t.status === TASK_STATUS.DONE).length,
     };
 
     const phaseDistribution = project.phases.map(phase => ({

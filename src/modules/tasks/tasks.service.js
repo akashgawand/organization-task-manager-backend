@@ -1,6 +1,7 @@
 const { getPrismaClient } = require('../../config/db');
 const { getPaginationParams, createPaginatedResponse } = require('../../utils/pagination');
 const { TASK_STATUS, isValidTransition, ACTIVITY_TYPES } = require('../../constants/taskStatus');
+const notificationService = require('../notifications/notification.service');
 
 const prisma = getPrismaClient();
 
@@ -103,6 +104,31 @@ const createTask = async (taskData, userId, userRole) => {
             description: `Created task: ${title}`,
         },
     });
+
+    if (assigneeIdList.length > 0) {
+        // Find team lead if task belongs to team
+        let team_lead_id = null;
+        if (project.team_id) {
+            const team = await prisma.team.findUnique({ where: { team_id: project.team_id } });
+            if (team) team_lead_id = team.lead_id;
+        }
+
+        await notificationService.queueEvent(ACTIVITY_TYPES.TASK_ASSIGNED, {
+            task_id: task.task_id,
+            task_title: task.title,
+            assignees: assigneeIdList,
+            actor_id: userId,
+            team_lead_id
+        });
+    }
+
+    if (priority === 'CRITICAL') {
+        await notificationService.queueEvent('CRITICAL_TASK_ASSIGNED', {
+            task_id: task.task_id,
+            task_title: task.title,
+            actor_id: userId
+        });
+    }
 
     return task;
 };
@@ -247,9 +273,14 @@ const updateTaskStatus = async (taskId, newStatus, userId) => {
         where: { task_id: parseInt(taskId) },
         data: { status: newStatus },
         include: {
-            project: { select: { name: true } },
-            assignees: { select: { full_name: true } },
+            project: { select: { name: true, team_id: true } },
+            assignees: { select: { user_id: true, full_name: true } },
         },
+    });
+
+    const actor = await prisma.user.findUnique({
+        where: { user_id: userId },
+        select: { full_name: true }
     });
 
     await prisma.activityLog.create({
@@ -260,6 +291,35 @@ const updateTaskStatus = async (taskId, newStatus, userId) => {
             description: `Changed task status from ${task.status} to ${newStatus}`,
         },
     });
+
+    // Find team lead if exists
+    let team_lead_id = null;
+    if (updatedTask.project && updatedTask.project.team_id) {
+        const team = await prisma.team.findUnique({ where: { team_id: updatedTask.project.team_id } });
+        if (team) team_lead_id = team.lead_id;
+    }
+
+    await notificationService.queueEvent(ACTIVITY_TYPES.TASK_STATUS_CHANGED, {
+        task_id: task.task_id,
+        task_title: task.title,
+        old_status: task.status,
+        new_status: newStatus,
+        assignees: updatedTask.assignees.map(a => a.user_id),
+        assignee_names: updatedTask.assignees.map(a => a.full_name).join(', '),
+        actor_id: userId,
+        actor_name: actor ? actor.full_name : 'System',
+        team_lead_id
+    });
+
+    if (newStatus === TASK_STATUS.BLOCKED) {
+
+        await notificationService.queueEvent('TASK_BLOCKED', {
+            task_id: task.task_id,
+            task_title: task.title,
+            actor_id: userId,
+            team_lead_id
+        });
+    }
 
     return updatedTask;
 };
@@ -298,6 +358,22 @@ const assignTask = async (taskId, assignedTo, userId) => {
         },
     });
 
+    // Notify new assignees
+    let team_lead_id = null;
+    const proj = await prisma.project.findUnique({ where: { project_id: task.project_id } });
+    if (proj && proj.team_id) {
+        const team = await prisma.team.findUnique({ where: { team_id: proj.team_id } });
+        if (team) team_lead_id = team.lead_id;
+    }
+
+    await notificationService.queueEvent(ACTIVITY_TYPES.TASK_ASSIGNED, {
+        task_id: task.task_id,
+        task_title: task.title,
+        assignees: assigneeIds,
+        actor_id: userId,
+        team_lead_id
+    });
+
     return updatedTask;
 };
 
@@ -329,6 +405,31 @@ const addComment = async (taskId, content, userId) => {
             user: { select: { user_id: true, full_name: true, avatar: true } },
         },
     });
+
+    // Check for mentions using regex (e.g. @user_id or simple matching if you map names)
+    // For this implementation, let's assume `content` might have @[id] format
+    const mentionRegex = /@\[(\d+)\]/g;
+    const mentionedUsers = [];
+    let match;
+    while ((match = mentionRegex.exec(content.trim())) !== null) {
+        mentionedUsers.push(parseInt(match[1]));
+    }
+
+    if (mentionedUsers.length > 0) {
+        // Update comment with parsed mentions
+        await prisma.comment.update({
+            where: { comment_id: comment.comment_id },
+            data: { mentions: mentionedUsers }
+        });
+
+        await notificationService.queueEvent('MENTIONED', {
+            entity_type: 'COMMENT',
+            entity_id: comment.comment_id,
+            mentioned_users: mentionedUsers,
+            actor_id: userId,
+            actor_name: comment.user.full_name
+        });
+    }
 
     return comment;
 };

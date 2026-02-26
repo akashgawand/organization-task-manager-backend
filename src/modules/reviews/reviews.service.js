@@ -1,5 +1,6 @@
 const { getPrismaClient } = require('../../config/db');
 const { TASK_STATUS, SUBMISSION_STATUS, ACTIVITY_TYPES } = require('../../constants/taskStatus');
+const notificationService = require('../notifications/notification.service');
 
 const prisma = getPrismaClient();
 
@@ -7,7 +8,10 @@ class ReviewsService {
     async approveSubmission(submissionId, reviewNote, reviewerId) {
         const submission = await prisma.submission.findUnique({
             where: { submission_id: submissionId },
-            include: { task: true },
+            include: {
+                task: true,
+                submitter: { select: { full_name: true } }
+            },
         });
 
         if (!submission) throw new Error('Submission not found');
@@ -63,6 +67,23 @@ class ReviewsService {
             return review;
         });
 
+        // Queue notification
+        let team_lead_id = null;
+        const proj = await prisma.project.findUnique({ where: { project_id: submission.task.project_id } });
+        if (proj && proj.team_id) {
+            const team = await prisma.team.findUnique({ where: { team_id: proj.team_id } });
+            if (team) team_lead_id = team.lead_id;
+        }
+
+        await notificationService.queueEvent('SUBMISSION_APPROVED', {
+            task_id: submission.task_id,
+            task_title: submission.task.title,
+            submitter_id: submission.submitted_by,
+            submitter_name: submission.submitter ? submission.submitter.full_name : 'Unknown',
+            reviewer_name: result.reviewer.full_name,
+            team_lead_id
+        });
+
         return result;
     }
 
@@ -115,6 +136,13 @@ class ReviewsService {
             });
 
             return review;
+        });
+
+        await notificationService.queueEvent('SUBMISSION_REJECTED', {
+            task_id: submission.task_id,
+            task_title: submission.task.title,
+            submitter_id: submission.submitted_by,
+            actor_name: result.reviewer.full_name
         });
 
         return result;

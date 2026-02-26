@@ -2,6 +2,7 @@ const { getPrismaClient } = require('../../config/db');
 const { getPaginationParams, createPaginatedResponse } = require('../../utils/pagination');
 const { ACTIVITY_TYPES } = require('../../constants/taskStatus');
 const logger = require('../../utils/logger');
+const notificationService = require('../notifications/notification.service');
 
 const prisma = getPrismaClient();
 
@@ -77,6 +78,13 @@ const createProject = async (projectData, userId) => {
     });
 
     logger.info(`Project created with ${phasesToCreate.length} phases: ${name}`);
+
+    // Notify about project creation
+    await notificationService.queueEvent(ACTIVITY_TYPES.PROJECT_CREATED, {
+        project_id: project.project_id,
+        project_name: project.name,
+        actor_id: userId
+    });
 
     // Fetch project with phases
     return getProjectById(project.project_id);

@@ -45,4 +45,8 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
+// Start background workers
+const { startWorker } = require('./modules/notifications/notification.worker');
+startWorker();
+
 module.exports = app;

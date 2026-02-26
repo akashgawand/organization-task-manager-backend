@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { getPaginationParams } = require('../../utils/pagination');
+const { ACTIVITY_TYPES } = require('../../constants/taskStatus');
+const notificationService = require('../notifications/notification.service');
 
 const prisma = new PrismaClient();
 
@@ -60,6 +62,13 @@ const createTeam = async (data, creatorId) => {
                 },
             },
         },
+    });
+
+    await notificationService.queueEvent(ACTIVITY_TYPES.TEAM_CREATED, {
+        team_id: team.team_id,
+        team_name: team.name,
+        lead_id: team.lead_id,
+        actor_id: creatorId
     });
 
     return team;

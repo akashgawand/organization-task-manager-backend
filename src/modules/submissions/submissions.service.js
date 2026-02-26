@@ -1,5 +1,6 @@
 const { getPrismaClient } = require('../../config/db');
 const { TASK_STATUS, SUBMISSION_STATUS, ACTIVITY_TYPES } = require('../../constants/taskStatus');
+const notificationService = require('../notifications/notification.service');
 
 const prisma = getPrismaClient();
 
@@ -53,6 +54,21 @@ class SubmissionsService {
             });
 
             return newSubmission;
+        });
+
+        // Queue notification
+        let team_lead_id = null;
+        const proj = await prisma.project.findUnique({ where: { project_id: task.project_id } });
+        if (proj && proj.team_id) {
+            const team = await prisma.team.findUnique({ where: { team_id: proj.team_id } });
+            if (team) team_lead_id = team.lead_id;
+        }
+
+        await notificationService.queueEvent('REVIEW_REQUESTED', {
+            task_id,
+            task_title: task.title,
+            actor_name: submission.submitter.full_name,
+            team_lead_id
         });
 
         return submission;
