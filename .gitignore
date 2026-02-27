@@ -38,3 +38,4 @@ build/
 # Credentials
 *firebase-adminsdk*.json
 *-fbsvc-*.json
+*apexquants-3ba48-firebase-adminsdk-fbsvc-4ea61cef89.json
