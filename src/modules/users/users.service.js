@@ -220,8 +220,38 @@ class UsersService {
      * Save FCM Token
      */
     async saveFcmToken(userId, token) {
+        const parsedUserId = parseInt(userId);
+
+        // 1. Remove this token from any OTHER user who might have it 
+        // (This happens if multiple users log in from the exact same browser/computer)
+        const otherUsersWithTokens = await prisma.user.findMany({
+            where: {
+                user_id: { not: parsedUserId },
+                fcm_tokens: { not: null }
+            },
+            select: { user_id: true, fcm_tokens: true }
+        });
+
+        for (const otherUser of otherUsersWithTokens) {
+            let otherTokens = [];
+            if (Array.isArray(otherUser.fcm_tokens)) {
+                otherTokens = otherUser.fcm_tokens;
+            } else if (typeof otherUser.fcm_tokens === 'string') {
+                try { otherTokens = JSON.parse(otherUser.fcm_tokens); } catch (e) { }
+            }
+
+            if (otherTokens.includes(token)) {
+                const refreshedTokens = otherTokens.filter(t => t !== token);
+                await prisma.user.update({
+                    where: { user_id: otherUser.user_id },
+                    data: { fcm_tokens: refreshedTokens }
+                });
+            }
+        }
+
+        // 2. Add the token to the current user
         const user = await prisma.user.findUnique({
-            where: { user_id: parseInt(userId) },
+            where: { user_id: parsedUserId },
             select: { fcm_tokens: true }
         });
 
@@ -245,7 +275,7 @@ class UsersService {
         if (!tokens.includes(token)) {
             tokens.push(token);
             await prisma.user.update({
-                where: { user_id: parseInt(userId) },
+                where: { user_id: parsedUserId },
                 data: { fcm_tokens: tokens }
             });
         }

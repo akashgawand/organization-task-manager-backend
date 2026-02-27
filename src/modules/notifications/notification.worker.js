@@ -98,6 +98,22 @@ const processQueue = async () => {
                         }
                     });
                     break;
+                case 'EXTENSION_REQUESTED':
+                    const extMessage = `${payload.actor_name} requested a due date extension for task "${payload.task_title}" to ${new Date(payload.requested_date).toLocaleDateString()}. Reason: ${payload.reason}`;
+                    const extTitle = 'Due Date Extension Requested';
+
+                    // Notify creator
+                    if (payload.creator_id && payload.creator_id !== payload.actor_id) {
+                        addNotification(payload.creator_id, event_type, extTitle, extMessage, 'TASK', payload.task_id);
+                    }
+
+                    // Notify Admins
+                    superAdmins.concat(admins).forEach(a => {
+                        if (a.user_id !== payload.actor_id && a.user_id !== payload.creator_id) {
+                            addNotification(a.user_id, event_type, extTitle, extMessage, 'TASK', payload.task_id);
+                        }
+                    });
+                    break;
                 case ACTIVITY_TYPES.TASK_ASSIGNED:
                     // Notify Assignees (Employee / Sr Developer / Team Lead)
                     if (payload.assignees && Array.isArray(payload.assignees)) {
@@ -107,7 +123,12 @@ const processQueue = async () => {
                     }
                     // Notify Team Lead
                     if (payload.team_lead_id) {
-                        addNotification(payload.team_lead_id, event_type, 'Task Assigned to Team', `Task ${payload.task_title} was assigned to your team.`, 'TASK', payload.task_id);
+                        const isIndividualAssignment = payload.assignees && payload.assignees.length > 0;
+                        const title = isIndividualAssignment ? 'Task Assigned to Team Member' : 'Task Assigned to Team';
+                        const message = isIndividualAssignment
+                            ? `Task ${payload.task_title} was assigned to a member of your team.`
+                            : `Task ${payload.task_title} was assigned to your team.`;
+                        addNotification(payload.team_lead_id, event_type, title, message, 'TASK', payload.task_id);
                     }
                     break;
                 case 'CRITICAL_TASK_ASSIGNED':

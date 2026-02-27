@@ -51,7 +51,7 @@ const updateTask = async (req, res, next) => {
 
 const updateTaskStatus = async (req, res, next) => {
     try {
-        const task = await tasksService.updateTaskStatus(req.params.id, req.body.status, req.user.user_id);
+        const task = await tasksService.updateTaskStatus(req.params.id, req.body.status, req.user.user_id, req.user.role);
         return successResponse(res, task, 'Task status updated successfully');
     } catch (error) {
         if (error.message === 'Task not found') {
@@ -107,6 +107,23 @@ const addComment = async (req, res, next) => {
     }
 };
 
+const requestExtension = async (req, res, next) => {
+    try {
+        await tasksService.requestExtension(
+            req.params.id,
+            req.user.user_id,
+            req.body.reason,
+            req.body.requestedDate
+        );
+        return successResponse(res, null, 'Extension requested successfully');
+    } catch (error) {
+        if (error.message === 'Task not found') {
+            return errorResponse(res, error.message, 404);
+        }
+        next(error);
+    }
+};
+
 module.exports = {
     createTask,
     getTasks,
@@ -116,4 +133,5 @@ module.exports = {
     assignTask,
     deleteTask,
     addComment,
+    requestExtension,
 };
