@@ -54,6 +54,13 @@ const assignTaskSchema = z.object({
     }),
 });
 
+const extensionRequestSchema = z.object({
+    body: z.object({
+        reason: z.string().min(1, 'Reason is required'),
+        requestedDate: z.string().min(1, 'Requested date is required'),
+    }),
+});
+
 const queryTasksSchema = z.object({
     query: z.object({
         page: z.string().optional().default('1'),
@@ -77,6 +84,7 @@ module.exports = {
     updateTaskSchema,
     updateTaskStatusSchema,
     assignTaskSchema,
+    extensionRequestSchema,
     queryTasksSchema,
     taskIdParamSchema,
 };

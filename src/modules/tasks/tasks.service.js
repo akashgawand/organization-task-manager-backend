@@ -232,6 +232,12 @@ const updateTask = async (taskId, updateData, userId, userRole) => {
         where: { task_id: parseInt(taskId) },
         data: {
             ...rest,
+            ...(rest.phase_id !== undefined && {
+                phase_id: parseInt(rest.phase_id)
+            }),
+            ...(rest.deadline !== undefined && {
+                deadline: rest.deadline ? new Date(rest.deadline) : null
+            }),
             ...(assigneeIdList !== null && {
                 assignees: {
                     set: assigneeIdList.map((id) => ({ user_id: id })),
@@ -262,11 +268,13 @@ const updateTask = async (taskId, updateData, userId, userRole) => {
     return updatedTask;
 };
 
-const updateTaskStatus = async (taskId, newStatus, userId) => {
+const updateTaskStatus = async (taskId, newStatus, userId, userRole = null) => {
     const task = await prisma.task.findUnique({ where: { task_id: parseInt(taskId) } });
     if (!task || task.is_deleted) throw new Error('Task not found');
 
-    if (!isValidTransition(task.status, newStatus)) {
+    const isCreator = task.created_by === userId;
+
+    if (!isValidTransition(task.status, newStatus, userRole, isCreator)) {
         throw new Error(`Invalid status transition from ${task.status} to ${newStatus}`);
     }
 
@@ -476,6 +484,40 @@ const addComment = async (taskId, content, userId) => {
     return comment;
 };
 
+const requestExtension = async (taskId, userId, reason, requestedDate) => {
+    const task = await prisma.task.findUnique({
+        where: { task_id: parseInt(taskId) },
+        include: {
+            project: { select: { team_id: true } }
+        }
+    });
+
+    if (!task || task.is_deleted) throw new Error('Task not found');
+
+    const actor = await prisma.user.findUnique({
+        where: { user_id: userId },
+        select: { full_name: true }
+    });
+
+    let team_lead_id = null;
+    if (task.project && task.project.team_id) {
+        const team = await prisma.team.findUnique({ where: { team_id: task.project.team_id } });
+        if (team) team_lead_id = team.lead_id;
+    }
+
+    // Queue notification event for the creator (and admins via worker)
+    await notificationService.queueEvent('EXTENSION_REQUESTED', {
+        task_id: task.task_id,
+        task_title: task.title,
+        actor_id: userId,
+        actor_name: actor ? actor.full_name : 'User',
+        reason: reason,
+        requested_date: requestedDate,
+        creator_id: task.created_by,
+        team_lead_id: team_lead_id
+    });
+};
+
 module.exports = {
     createTask,
     getTasks,
@@ -485,4 +527,5 @@ module.exports = {
     assignTask,
     deleteTask,
     addComment,
+    requestExtension,
 };

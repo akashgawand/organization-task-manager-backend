@@ -32,10 +32,17 @@ const canTransitionTo = (currentStatus, newStatus) => {
     return STATUS_TRANSITIONS[currentStatus]?.includes(newStatus) || false;
 };
 
-const isValidTransition = (currentStatus, newStatus) => {
+const isValidTransition = (currentStatus, newStatus, userRole = null, isCreator = false) => {
     if (currentStatus === newStatus) {
         return true;
     }
+
+    // Super Admins, Admins, and the Task Creator can move tasks to ANY state.
+    if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || isCreator) {
+        // As long as it's a valid enum value
+        return Object.values(TASK_STATUS).includes(newStatus);
+    }
+
     return canTransitionTo(currentStatus, newStatus);
 };
 

@@ -8,6 +8,7 @@ const {
     updateTaskSchema,
     updateTaskStatusSchema,
     assignTaskSchema,
+    extensionRequestSchema,
     queryTasksSchema,
     taskIdParamSchema,
 } = require('./tasks.validation');
@@ -64,6 +65,13 @@ router.patch(
 router.post(
     '/:id/comments',
     tasksController.addComment
+);
+
+// POST /api/v1/tasks/:id/extension-request - Request a due date extension (assignee)
+router.post(
+    '/:id/extension-request',
+    validate({ ...taskIdParamSchema, ...extensionRequestSchema }),
+    tasksController.requestExtension
 );
 
 // DELETE /api/v1/tasks/:id - Delete task (Manager/Admin)
