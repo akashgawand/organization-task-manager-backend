@@ -34,3 +34,7 @@ prisma/migrations/
 # Build
 dist/
 build/
+
+# Credentials
+*firebase-adminsdk*.json
+*-fbsvc-*.json
