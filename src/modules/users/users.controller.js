@@ -115,6 +115,22 @@ const updatePassword = async (req, res, next) => {
     }
 };
 
+/**
+ * Save FCM token
+ */
+const saveFcmToken = async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return errorResponse(res, 'Token is required', 400);
+        }
+        await usersService.saveFcmToken(req.user.user_id, token);
+        return successResponse(res, null, 'FCM token saved successfully');
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getUsers,
     getUserById,
@@ -123,4 +139,5 @@ module.exports = {
     changeUserRole,
     updateOwnProfile,
     updatePassword,
+    saveFcmToken,
 };

@@ -198,6 +198,8 @@ const processQueue = async () => {
                     break;
             }
 
+            let validInserts = [];
+
             // Insert generated notifications
             if (notificationInserts.length > 0) {
                 // Filter by preferences
@@ -209,7 +211,7 @@ const processQueue = async () => {
                 });
 
                 // Keep only those who haven't explicitly disabled in_app for this event
-                const validInserts = notificationInserts.filter(n => {
+                validInserts = notificationInserts.filter(n => {
                     const pref = prefs.find(p => p.user_id === n.user_id);
                     return pref ? pref.in_app : true;
                 });
@@ -226,6 +228,35 @@ const processQueue = async () => {
                 where: { queue_id },
                 data: { processed: true }
             });
+
+            // Dispatch FCM for all validInserts asynchronously
+            if (validInserts.length > 0) {
+                const pushQueueInserts = validInserts.map(insert => {
+                    let linkUrl = '/dashboard';
+                    if (insert.entity_type === 'TASK' && insert.entity_id) linkUrl = `/dashboard/my-tasks`;
+                    if (insert.entity_type === 'PROJECT' && insert.entity_id) linkUrl = `/dashboard/projects/${insert.entity_id}`;
+                    if (insert.entity_type === 'TEAM' && insert.entity_id) linkUrl = `/dashboard/teams/${insert.entity_id}`;
+
+                    // Comment fallback
+                    if (insert.entity_type === 'COMMENT') {
+                        if (payload.task_id) linkUrl = `/dashboard/my-tasks`;
+                        else linkUrl = `/dashboard`;
+                    }
+
+                    return {
+                        user_id: insert.user_id,
+                        title: insert.title,
+                        body: insert.message,
+                        data: { url: linkUrl },
+                        status: 'PENDING',
+                        attempts: 0
+                    };
+                });
+
+                await prisma.pushNotificationQueue.createMany({
+                    data: pushQueueInserts
+                });
+            }
         }
 
     } catch (error) {

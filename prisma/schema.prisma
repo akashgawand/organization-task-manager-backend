@@ -73,6 +73,7 @@ model User {
   department String? @db.VarChar(100)
   position   String? @db.VarChar(100)
   skills     Json? // String[] stored as JSON
+  fcm_tokens Json? // Array of strings (device tokens)
 
   is_active  Boolean  @default(true)
   is_deleted Boolean  @default(false)
@@ -435,4 +436,20 @@ model NotificationQueue {
 
   @@index([processed, created_at])
   @@map("notification_queue")
+}
+
+model PushNotificationQueue {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  title      String   @db.VarChar(255)
+  body       String   @db.Text
+  data       Json?
+  status     String   @default("PENDING") @db.VarChar(50) // PENDING, SENT, FAILED
+  attempts   Int      @default(0)
+  error_log  String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status, attempts])
+  @@map("push_notification_queue")
 }

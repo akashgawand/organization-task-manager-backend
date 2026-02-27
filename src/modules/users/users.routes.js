@@ -55,6 +55,12 @@ router.patch(
     usersController.changeUserRole
 );
 
+// POST /api/v1/users/fcm-token - Save FCM device token
+router.post(
+    '/fcm-token',
+    usersController.saveFcmToken
+);
+
 // PATCH /api/v1/users/profile - Update own profile
 router.patch(
     '/profile',
