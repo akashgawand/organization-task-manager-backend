@@ -2,6 +2,7 @@ const { getPrismaClient } = require('../../config/db');
 const { getPaginationParams, createPaginatedResponse } = require('../../utils/pagination');
 const { TASK_STATUS, isValidTransition, ACTIVITY_TYPES } = require('../../constants/taskStatus');
 const notificationService = require('../notifications/notification.service');
+const admin = require('../../config/firebase');
 
 const prisma = getPrismaClient();
 
@@ -388,7 +389,14 @@ const deleteTask = async (taskId) => {
 };
 
 const addComment = async (taskId, content, userId) => {
-    const task = await prisma.task.findUnique({ where: { task_id: parseInt(taskId) } });
+    const task = await prisma.task.findUnique({
+        where: { task_id: parseInt(taskId) },
+        include: {
+            assignees: { select: { user_id: true, fcm_tokens: true } },
+            creator: { select: { user_id: true, fcm_tokens: true } }
+        }
+    });
+
     if (!task || task.is_deleted) throw new Error('Task not found');
 
     if (!content || !content.trim()) throw new Error('Comment content is required');
@@ -406,8 +414,7 @@ const addComment = async (taskId, content, userId) => {
         },
     });
 
-    // Check for mentions using regex (e.g. @user_id or simple matching if you map names)
-    // For this implementation, let's assume `content` might have @[id] format
+    // Check for mentions using regex
     const mentionRegex = /@\[(\d+)\]/g;
     const mentionedUsers = [];
     let match;
@@ -416,7 +423,6 @@ const addComment = async (taskId, content, userId) => {
     }
 
     if (mentionedUsers.length > 0) {
-        // Update comment with parsed mentions
         await prisma.comment.update({
             where: { comment_id: comment.comment_id },
             data: { mentions: mentionedUsers }
@@ -429,6 +435,42 @@ const addComment = async (taskId, content, userId) => {
             actor_id: userId,
             actor_name: comment.user.full_name
         });
+    }
+
+    // Dispatch FCM
+    const tokens = new Set();
+
+    // gather tokens from assignees
+    task.assignees.forEach(a => {
+        if (a.user_id !== userId && a.fcm_tokens) {
+            let t = [];
+            try { t = Array.isArray(a.fcm_tokens) ? a.fcm_tokens : (typeof a.fcm_tokens === 'string' ? JSON.parse(a.fcm_tokens) : []); } catch (e) { }
+            t.forEach(token => tokens.add(token));
+        }
+    });
+    // gather creator token
+    if (task.creator && task.creator.user_id !== userId && task.creator.fcm_tokens) {
+        let t = [];
+        try { t = Array.isArray(task.creator.fcm_tokens) ? task.creator.fcm_tokens : (typeof task.creator.fcm_tokens === 'string' ? JSON.parse(task.creator.fcm_tokens) : []); } catch (e) { }
+        t.forEach(token => tokens.add(token));
+    }
+
+    if (tokens.size > 0 && admin && admin.messaging) {
+        try {
+            const message = {
+                notification: {
+                    title: `New comment on: ${task.title}`,
+                    body: `${comment.user.full_name}: ${content.trim()}`
+                },
+                data: {
+                    url: `/dashboard/projects/${task.project_id}?task=${task.task_id}`
+                },
+                tokens: Array.from(tokens)
+            };
+            await admin.messaging().sendEachForMulticast(message);
+        } catch (e) {
+            console.error('Error sending FCM:', e);
+        }
     }
 
     return comment;

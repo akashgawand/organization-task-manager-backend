@@ -47,6 +47,9 @@ app.use(errorHandler);
 
 // Start background workers
 const { startWorker } = require('./modules/notifications/notification.worker');
+const { startPushWorker } = require('./modules/notifications/push.worker');
+
 startWorker();
+startPushWorker();
 
 module.exports = app;

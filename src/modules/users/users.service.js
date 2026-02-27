@@ -215,6 +215,42 @@ class UsersService {
 
         return true;
     }
+
+    /**
+     * Save FCM Token
+     */
+    async saveFcmToken(userId, token) {
+        const user = await prisma.user.findUnique({
+            where: { user_id: parseInt(userId) },
+            select: { fcm_tokens: true }
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        let tokens = [];
+        if (user.fcm_tokens) {
+            if (Array.isArray(user.fcm_tokens)) {
+                tokens = user.fcm_tokens;
+            } else if (typeof user.fcm_tokens === 'string') {
+                try {
+                    tokens = JSON.parse(user.fcm_tokens);
+                } catch (e) {
+                    tokens = [];
+                }
+            }
+        }
+
+        if (!tokens.includes(token)) {
+            tokens.push(token);
+            await prisma.user.update({
+                where: { user_id: parseInt(userId) },
+                data: { fcm_tokens: tokens }
+            });
+        }
+        return true;
+    }
 }
 
 module.exports = new UsersService();
