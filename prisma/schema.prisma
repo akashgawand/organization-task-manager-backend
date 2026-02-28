@@ -89,6 +89,7 @@ model User {
   verified_tasks   VerifiedTask[]
   activity_logs    ActivityLog[]
   refresh_tokens   RefreshToken[]
+  attachments      TaskAttachment[]
 
   // Roles & Permissions (New RBAC)
   user_role_assignments UserRoleAssignment[]
@@ -217,6 +218,7 @@ model Task {
   submissions   Submission[]
   verified_task VerifiedTask?
   activity_logs ActivityLog[]
+  attachments   TaskAttachment[]
 
   @@index([project_id])
   @@index([phase_id])
@@ -457,6 +459,22 @@ model PushNotificationQueue {
   @@map("push_notification_queue")
 }
 
+model TaskAttachment {
+  attachment_id Int      @id @default(autoincrement())
+  task_id       Int
+  file_name     String   @db.VarChar(255)
+  file_url      String   @db.Text
+  file_key      String   @db.VarChar(500) // R2 object key for deletion
+  file_type     String   @db.VarChar(100)
+  file_size     Int                        // bytes
+  uploaded_by   Int
+  created_at    DateTime @default(now())
+
+  task     Task @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaded_by], references: [user_id])
+
+  @@index([task_id])
+  @@map("task_attachments")
 // ============================================
 // ROLE-BASED ACCESS CONTROL (RBAC)
 // ============================================
