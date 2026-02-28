@@ -46,6 +46,18 @@ const taskInclude = {
     creator: { select: { user_id: true, full_name: true, email: true } },
     assignees: { select: { user_id: true, full_name: true, email: true, avatar: true } },
     subtasks: { orderBy: { created_at: 'asc' } },
+    attachments: {
+        select: {
+            attachment_id: true,
+            file_name: true,
+            file_url: true,
+            file_type: true,
+            file_size: true,
+            uploaded_by: true,
+            created_at: true,
+        },
+        orderBy: { created_at: 'desc' },
+    },
 };
 
 const createTask = async (taskData, userId, userRole) => {
