@@ -1,12 +1,64 @@
 import { PrismaClient, UserRole, TeamStatus, ProjectStatus, TaskPriority, TaskStatus } from '@prisma/client';
 
+const ROLES = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    ADMIN: 'ADMIN',
+    TEAM_LEAD: 'TEAM_LEAD',
+    SENIOR_DEVELOPER: 'SENIOR_DEVELOPER',
+    EMPLOYEE: 'EMPLOYEE',
+};
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+    [ROLES.SUPER_ADMIN]: [
+        'user:create', 'user:read', 'user:update', 'user:delete', 'user:change-role',
+        'project:create', 'project:read', 'project:update', 'project:delete',
+        'phase:create', 'phase:read', 'phase:update', 'phase:delete',
+        'task:create', 'task:read', 'task:update', 'task:delete', 'task:assign',
+        'team:create', 'team:read', 'team:update', 'team:delete',
+        'tag:create', 'tag:read', 'tag:update', 'tag:delete',
+        'submission:create', 'submission:read',
+        'review:create', 'review:read',
+        'dashboard:read', 'activity:read',
+    ],
+    [ROLES.ADMIN]: [
+        'user:read',
+        'project:create', 'project:read', 'project:update', 'project:delete',
+        'phase:create', 'phase:read', 'phase:update', 'phase:delete',
+        'task:create', 'task:read', 'task:update', 'task:delete', 'task:assign',
+        'team:create', 'team:read', 'team:update', 'team:delete',
+        'tag:create', 'tag:read', 'tag:update', 'tag:delete',
+        'submission:read',
+        'review:create', 'review:read',
+        'dashboard:read', 'activity:read',
+    ],
+    [ROLES.TEAM_LEAD]: [
+        'user:read', 'project:read', 'phase:read',
+        'task:create', 'task:read', 'task:update', 'task:assign',
+        'team:read', 'tag:read', 'submission:read',
+        'review:create', 'review:read',
+        'dashboard:read', 'activity:read',
+    ],
+    [ROLES.SENIOR_DEVELOPER]: [
+        'user:read', 'project:read', 'phase:read',
+        'task:create', 'task:read', 'task:update', 'task:assign',
+        'team:read', 'tag:read', 'submission:read',
+        'review:create', 'review:read',
+        'dashboard:read', 'activity:read',
+    ],
+    [ROLES.EMPLOYEE]: [
+        'user:read', 'project:read', 'phase:read',
+        'task:read', 'task:update', 'team:read', 'tag:read',
+        'submission:create', 'submission:read',
+        'activity:read',
+    ],
+};
+
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Start seeding...');
 
-  // 1. Clean up existing data (optional, but good for idempotent runs)
-  // Order matters due to foreign keys
+  // 1. Clean up existing data (Order matters due to foreign keys)
   await prisma.activityLog.deleteMany();
   await prisma.review.deleteMany();
   await prisma.submission.deleteMany();
@@ -16,16 +68,56 @@ async function main() {
   await prisma.phase.deleteMany();
   await prisma.project.deleteMany();
   await prisma.team.deleteMany();
+  
+  // RBAC Clean up
+  await prisma.userRoleAssignment.deleteMany();
+  await prisma.rolePermission.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.permission.deleteMany();
+  await prisma.role.deleteMany();
+  
   await prisma.tag.deleteMany();
 
   console.log('Deleted existing data.');
 
-  // 2. Create Users
+  // 2. Seed Roles and Permissions
+  console.log('Seeding Roles and Permissions...');
+  const roleMap: Record<string, any> = {};
+
+  for (const [roleKey, roleName] of Object.entries(ROLES)) {
+    const roleStr = roleName as string;
+    // Create Role
+    const role = await prisma.role.create({
+      data: { name: roleStr }
+    });
+    roleMap[roleStr] = role;
+
+    // Create Permissions and link them
+    const permissions = ROLE_PERMISSIONS[roleStr] || [];
+    for (const permName of permissions) {
+      // Upsert to avoid duplicates if multiple roles share a permission
+      const permission = await prisma.permission.upsert({
+        where: { name: permName },
+        update: {},
+        create: { name: permName }
+      });
+
+      await prisma.rolePermission.create({
+        data: {
+          role_id: role.id,
+          permission_id: permission.id
+        }
+      });
+    }
+  }
+  console.log('Roles and Permissions seeded.');
+
+
+  // 3. Create Users
   const usersData = [
     {
       email: 'sarah.johnson@company.com',
-      password: 'hashed_password_123', // In real app, hash this!
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW', // hashed 'password123' just as placeholder
       full_name: 'Sarah Johnson',
       role: UserRole.SUPER_ADMIN,
       avatar: 'SJ',
@@ -35,7 +127,7 @@ async function main() {
     },
     {
       email: 'michael.chen@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'Michael Chen',
       role: UserRole.ADMIN,
       avatar: 'MC',
@@ -45,7 +137,7 @@ async function main() {
     },
     {
       email: 'emily.rodriguez@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'Emily Rodriguez',
       role: UserRole.TEAM_LEAD,
       avatar: 'ER',
@@ -55,7 +147,7 @@ async function main() {
     },
     {
       email: 'david.kim@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'David Kim',
       role: UserRole.EMPLOYEE,
       avatar: 'DK',
@@ -65,7 +157,7 @@ async function main() {
     },
     {
       email: 'lisa.martinez@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'Lisa Martinez',
       role: UserRole.EMPLOYEE,
       avatar: 'LM',
@@ -75,7 +167,7 @@ async function main() {
     },
     {
       email: 'james.wilson@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'James Wilson',
       role: UserRole.ADMIN,
       avatar: 'JW',
@@ -84,7 +176,7 @@ async function main() {
     },
     {
       email: 'robert.taylor@company.com',
-      password: 'hashed_password_123',
+      password: '$2a$12$KkQeZq5K/x5QYkMZ8rMjB.mF5qA7lB2B4l2zLpZ4N6Y1eTqN4y/hW',
       full_name: 'Robert Taylor',
       role: UserRole.ADMIN,
       avatar: 'RT',
@@ -98,6 +190,16 @@ async function main() {
   for (const u of usersData) {
     const user = await prisma.user.create({ data: u });
     createdUsers.push(user);
+    
+    // Assign role in the new DB table
+    if (roleMap[user.role]) {
+       await prisma.userRoleAssignment.create({
+         data: {
+           user_id: user.user_id,
+           role_id: roleMap[user.role].id
+         }
+       });
+    }
   }
   
   // Map email to user for easy access
@@ -106,9 +208,9 @@ async function main() {
     return acc;
   }, {} as Record<string, typeof createdUsers[0]>);
 
-  console.log(`Created ${createdUsers.length} users.`);
+  console.log(`Created ${createdUsers.length} users and assigned DB roles.`);
 
-  // 3. Create Teams
+  // 4. Create Teams
   const teamsData = [
     {
       name: 'Engineering Team Alpha',
@@ -153,7 +255,6 @@ async function main() {
     createdTeams.push(team);
   }
   
-  // Map name to team
   const teamMap = createdTeams.reduce((acc, team) => {
     acc[team.name] = team;
     return acc;
@@ -161,7 +262,7 @@ async function main() {
 
   console.log(`Created ${createdTeams.length} teams.`);
 
-  // 4. Create Tags
+  // 5. Create Tags
   const tagsData = [
     { name: 'infrastructure', color: '#3B82F6' },
     { name: 'backend', color: '#10B981' },
@@ -186,7 +287,7 @@ async function main() {
 
   console.log(`Created ${createdTags.length} tags.`);
 
-  // 5. Create Projects
+  // 6. Create Projects
   const projectsData = [
     {
       name: 'Platform Modernization',
@@ -261,9 +362,9 @@ async function main() {
           create: p.phases.map(ph => ({
             name: ph.name,
             display_order: ph.order,
-            start_date: p.start_date, // Simplified: all phases start when project starts
-            end_date: p.end_date,     // Simplified: all phases end when project ends
-            status: ProjectStatus.PLANNING, // Default
+            start_date: p.start_date,
+            end_date: p.end_date,
+            status: ProjectStatus.PLANNING,
           })),
         },
       },
@@ -279,8 +380,7 @@ async function main() {
 
   console.log(`Created ${createdProjects.length} projects.`);
 
-  // 6. Create Tasks
-  // Get phases for project 1
+  // 7. Create Tasks
   const p1Phases = projectMap['Platform Modernization'].phases;
   
   const tasksData = [
@@ -370,7 +470,6 @@ async function main() {
   }
 
   console.log(`Created tasks.`);
-
   console.log('Seeding finished.');
 }
 
