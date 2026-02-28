@@ -475,6 +475,9 @@ model TaskAttachment {
 
   @@index([task_id])
   @@map("task_attachments")
+
+}
+
 // ============================================
 // ROLE-BASED ACCESS CONTROL (RBAC)
 // ============================================
