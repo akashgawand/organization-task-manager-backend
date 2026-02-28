@@ -1,7 +1,7 @@
 const express = require('express');
 const projectsController = require('./projects.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requirePermission } = require('../../middleware/role.middleware');
+const { requireRole } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     createProjectSchema,
@@ -18,7 +18,7 @@ router.use(authenticate);
 // POST /api/v1/projects - Create project (Manager/Admin)
 router.post(
     '/',
-    requirePermission('project:create'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate(createProjectSchema),
     projectsController.createProject
 );
@@ -40,7 +40,7 @@ router.get(
 // PUT /api/v1/projects/:id - Update project (Manager/Admin)
 router.put(
     '/:id',
-    requirePermission('project:update'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate({ ...projectIdParamSchema, ...updateProjectSchema }),
     projectsController.updateProject
 );
@@ -48,7 +48,7 @@ router.put(
 // DELETE /api/v1/projects/:id - Delete project (Manager/Admin)
 router.delete(
     '/:id',
-    requirePermission('project:delete'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate(projectIdParamSchema),
     projectsController.deleteProject
 );

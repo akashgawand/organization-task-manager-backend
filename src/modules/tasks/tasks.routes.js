@@ -1,7 +1,7 @@
 const express = require('express');
 const tasksController = require('./tasks.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requirePermission } = require('../../middleware/role.middleware');
+const { requireRole } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     createTaskSchema,
@@ -17,10 +17,10 @@ const router = express.Router();
 
 router.use(authenticate);
 
-// POST /api/v1/tasks - Create task (Manager/Admin)
+// POST /api/v1/tasks - Create task (Manager/Admin/TeamLead/SeniorDev)
 router.post(
     '/',
-    requirePermission('task:create'),
+    requireRole(['SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD', 'SENIOR_DEVELOPER']),
     validate(createTaskSchema),
     tasksController.createTask
 );
@@ -53,10 +53,10 @@ router.patch(
     tasksController.updateTaskStatus
 );
 
-// PATCH /api/v1/tasks/:id/assign - Assign task (Manager/Admin)
+// PATCH /api/v1/tasks/:id/assign - Assign task (Manager/Admin/TeamLead/SeniorDev)
 router.patch(
     '/:id/assign',
-    requirePermission('task:assign'),
+    requireRole(['SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD', 'SENIOR_DEVELOPER']),
     validate({ ...taskIdParamSchema, ...assignTaskSchema }),
     tasksController.assignTask
 );
@@ -77,7 +77,7 @@ router.post(
 // DELETE /api/v1/tasks/:id - Delete task (Manager/Admin)
 router.delete(
     '/:id',
-    requirePermission('task:delete'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate(taskIdParamSchema),
     tasksController.deleteTask
 );

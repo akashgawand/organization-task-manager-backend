@@ -3,7 +3,7 @@ const { successResponse, errorResponse, paginatedResponse, createdResponse } = r
 
 const createTask = async (req, res, next) => {
     try {
-        const task = await tasksService.createTask(req.body, req.user.user_id, req.user.role);
+        const task = await tasksService.createTask(req.body, req.user.user_id);
         return createdResponse(res, task, 'Task created successfully');
     } catch (error) {
         if (error.message.includes('not found') || error.message.includes('inactive')) {
@@ -18,7 +18,7 @@ const createTask = async (req, res, next) => {
 
 const getTasks = async (req, res, next) => {
     try {
-        const result = await tasksService.getTasks(req.query, req.user.user_id, req.user.role);
+        const result = await tasksService.getTasks(req.query, req.user.user_id);
         return paginatedResponse(res, result.data, result.pagination, 'Tasks retrieved successfully');
     } catch (error) {
         next(error);
@@ -39,7 +39,7 @@ const getTaskById = async (req, res, next) => {
 
 const updateTask = async (req, res, next) => {
     try {
-        const task = await tasksService.updateTask(req.params.id, req.body, req.user.user_id, req.user.role);
+        const task = await tasksService.updateTask(req.params.id, req.body, req.user.user_id);
         return successResponse(res, task, 'Task updated successfully');
     } catch (error) {
         if (error.message === 'Task not found') {
@@ -51,7 +51,7 @@ const updateTask = async (req, res, next) => {
 
 const updateTaskStatus = async (req, res, next) => {
     try {
-        const task = await tasksService.updateTaskStatus(req.params.id, req.body.status, req.user.user_id, req.user.role);
+        const task = await tasksService.updateTaskStatus(req.params.id, req.body.status, req.user.user_id);
         return successResponse(res, task, 'Task status updated successfully');
     } catch (error) {
         if (error.message === 'Task not found') {

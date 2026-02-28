@@ -6,7 +6,7 @@ const admin = require('../../config/firebase');
 
 const prisma = getPrismaClient();
 
-// Hierarchical assignment rules
+// Role rank used for hierarchical assignment enforcement (DB role names → numeric rank)
 const ROLE_RANK = {
     'SUPER_ADMIN': 5,
     'ADMIN': 4,
@@ -15,26 +15,38 @@ const ROLE_RANK = {
     'EMPLOYEE': 1
 };
 
+/**
+ * Get a user's role name from the user_roles (DB) table.
+ * Falls back to the legacy users.role field if not found.
+ */
+const getUserRoleFromDb = async (userId) => {
+    const assignment = await prisma.userRoleAssignment.findFirst({
+        where: { user_id: userId },
+        include: { role: true },
+    });
+    return assignment?.role?.name || null;
+};
+
 const checkAssignmentPermission = async (assignerId, assignerRole, assigneeIds) => {
     if (!assigneeIds || assigneeIds.length === 0) return;
     if (assignerRole === 'SUPER_ADMIN') return;
 
     const ids = assigneeIds.map(Number);
-    const assignees = await prisma.user.findMany({
-        where: { user_id: { in: ids } },
-        select: { user_id: true, role: true }
-    });
 
-    for (const assignee of assignees) {
+    for (const assigneeId of ids) {
         // Can always assign to self
-        if (assignee.user_id === assignerId) continue;
+        if (assigneeId === assignerId) continue;
+
+        // Fetch assignee role from DB (new RBAC)
+        const assigneeRole = await getUserRoleFromDb(assigneeId);
+        if (!assigneeRole) continue; // skip if no role found
 
         const assignerRank = ROLE_RANK[assignerRole] || 0;
-        const assigneeRank = ROLE_RANK[assignee.role] || 0;
+        const assigneeRank = ROLE_RANK[assigneeRole] || 0;
 
         // Can only assign to strictly lower roles (Super Admin is exempt)
         if (assignerRank <= assigneeRank) {
-            throw new Error(`Action forbidden: ${assignerRole} cannot assign tasks to ${assignee.role}`);
+            throw new Error(`Action forbidden: ${assignerRole} cannot assign tasks to ${assigneeRole}`);
         }
     }
 };
@@ -60,7 +72,7 @@ const taskInclude = {
     },
 };
 
-const createTask = async (taskData, userId, userRole) => {
+const createTask = async (taskData, userId) => {
     const { title, description, project_id, phase_id, assigned_to, assignee_ids, deadline, priority, subtasks } = taskData;
 
     // Support both single assigned_to and array of assignee_ids
@@ -70,7 +82,8 @@ const createTask = async (taskData, userId, userRole) => {
             ? [Number(assigned_to)]
             : [];
 
-    // Hierarchical assignment check
+    // Fetch assigner role from DB and run hierarchical assignment check
+    const userRole = await getUserRoleFromDb(userId);
     await checkAssignmentPermission(userId, userRole, assigneeIdList);
 
     // Verify project exists
@@ -146,8 +159,15 @@ const createTask = async (taskData, userId, userRole) => {
     return task;
 };
 
-const getTasks = async (query, userId, userRole) => {
+const getTasks = async (query, userId) => {
     const { skip, take } = getPaginationParams(query.page, query.limit);
+
+    // Fetch role from DB (new RBAC)
+    const roleRow = await prisma.$queryRawUnsafe(
+        `SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = ? LIMIT 1`,
+        userId
+    );
+    const userRole = roleRow[0]?.name || 'EMPLOYEE';
 
     const where = {
         is_deleted: false,
@@ -155,20 +175,11 @@ const getTasks = async (query, userId, userRole) => {
         ...(query.phase_id && { phase_id: parseInt(query.phase_id) }),
         ...(query.status && { status: query.status }),
         ...(query.priority && { priority: query.priority }),
-        // assigned_to filter: match via the many-to-many assignees relation
         ...(query.assigned_to && {
             assignees: { some: { user_id: parseInt(query.assigned_to) } },
         }),
         // Super Admins see everything (constrained by query filters).
-        // Admins see everything EXCEPT tasks created by or assigned to a Super Admin.
-        ...(userRole === 'ADMIN' && {
-            AND: [
-                { NOT: { assignees: { some: { role: 'SUPER_ADMIN' } } } },
-                { NOT: { creator: { role: 'SUPER_ADMIN' } } }
-            ]
-        }),
-        // Non-admins see only tasks assigned to them, created by them, or on their teams (in a fuller implementation)
-        // For now, retaining existing member-only visibility logic for employees/leads
+        // Non-admins see only tasks assigned to them or created by them
         ...((userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') && {
             OR: [
                 { assignees: { some: { user_id: userId } } },
@@ -223,7 +234,7 @@ const getTaskById = async (taskId) => {
     return task;
 };
 
-const updateTask = async (taskId, updateData, userId, userRole) => {
+const updateTask = async (taskId, updateData, userId) => {
     const task = await prisma.task.findUnique({ where: { task_id: parseInt(taskId) } });
     if (!task || task.is_deleted) throw new Error('Task not found');
 
@@ -235,8 +246,9 @@ const updateTask = async (taskId, updateData, userId, userRole) => {
             ? [Number(assigned_to)]
             : null;
 
-    // Hierarchical assignment check
+    // Fetch assigner role from DB for hierarchical assignment check
     if (assigneeIdList !== null) {
+        const userRole = await getUserRoleFromDb(userId);
         await checkAssignmentPermission(userId, userRole, assigneeIdList);
     }
 
@@ -280,10 +292,12 @@ const updateTask = async (taskId, updateData, userId, userRole) => {
     return updatedTask;
 };
 
-const updateTaskStatus = async (taskId, newStatus, userId, userRole = null) => {
+const updateTaskStatus = async (taskId, newStatus, userId) => {
     const task = await prisma.task.findUnique({ where: { task_id: parseInt(taskId) } });
     if (!task || task.is_deleted) throw new Error('Task not found');
 
+    // Fetch role from DB for the status transition check
+    const userRole = await getUserRoleFromDb(userId);
     const isCreator = task.created_by === userId;
 
     if (!isValidTransition(task.status, newStatus, userRole, isCreator)) {
