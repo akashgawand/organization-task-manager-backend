@@ -94,8 +94,15 @@ const createProject = async (projectData, userId) => {
 /**
  * Get all projects with pagination
  */
-const getProjects = async ({ page, limit, search }, userId, userRole) => {
+const getProjects = async ({ page, limit, search }, userId) => {
     const { skip, take } = getPaginationParams(page, limit);
+
+    // Fetch role from DB via Prisma (new RBAC)
+    const roleAssignment = await prisma.userRoleAssignment.findFirst({
+        where: { user_id: userId },
+        include: { role: true },
+    });
+    const userRole = roleAssignment?.role?.name || 'EMPLOYEE';
 
     const where = {
         is_deleted: false,

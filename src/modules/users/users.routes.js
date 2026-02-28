@@ -1,7 +1,7 @@
 const express = require('express');
 const usersController = require('./users.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requirePermission } = require('../../middleware/role.middleware');
+const { requireRole } = require('../../middleware/role.middleware');
 const { validate } = require('../../middleware/validate.middleware');
 const {
     updateUserSchema,
@@ -20,7 +20,7 @@ router.use(authenticate);
 // GET /api/v1/users - Get all users (Manager/Admin)
 router.get(
     '/',
-    requirePermission('user:read'),
+    requireRole(['SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD', 'SENIOR_DEVELOPER', 'EMPLOYEE']),
     validate(queryUsersSchema),
     usersController.getUsers
 );
@@ -42,7 +42,7 @@ router.put(
 // DELETE /api/v1/users/:id - Delete user (Admin only)
 router.delete(
     '/:id',
-    requirePermission('user:delete'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate(userIdParamSchema),
     usersController.deleteUser
 );
@@ -50,7 +50,7 @@ router.delete(
 // PATCH /api/v1/users/:id/role - Change user role (Admin only)
 router.patch(
     '/:id/role',
-    requirePermission('user:change-role'),
+    requireRole(['SUPER_ADMIN', 'ADMIN']),
     validate({ ...userIdParamSchema, ...changeRoleSchema }),
     usersController.changeUserRole
 );

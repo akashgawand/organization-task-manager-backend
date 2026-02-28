@@ -20,8 +20,8 @@ const getProjects = async (req, res, next) => {
     try {
         const result = await projectsService.getProjects(
             req.query,
-            req.user.user_id,
-            req.user.role
+            req.user.user_id
+            // role is now fetched from DB inside the service
         );
         return paginatedResponse(
             res,
