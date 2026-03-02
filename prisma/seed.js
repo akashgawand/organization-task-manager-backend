@@ -8,26 +8,26 @@ async function main() {
     // -------------------------------------------------------
     // 1. CLEAN UP (respecting foreign key order)
     // -------------------------------------------------------
-    await prisma.activityLog.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.submission.deleteMany();
-    await prisma.comment.deleteMany();
-    await prisma.subTask.deleteMany();
-    await prisma.task.deleteMany();
-    await prisma.phase.deleteMany();
-    await prisma.project.deleteMany();
-    await prisma.team.deleteMany();
-    await prisma.refreshToken.deleteMany();
-    await prisma.notification.deleteMany();
-    await prisma.notificationPreference.deleteMany();
+    // await prisma.activityLog.deleteMany();
+    // await prisma.review.deleteMany();
+    // await prisma.submission.deleteMany();
+    // await prisma.comment.deleteMany();
+    // await prisma.subTask.deleteMany();
+    // await prisma.task.deleteMany();
+    // await prisma.phase.deleteMany();
+    // await prisma.project.deleteMany();
+    // await prisma.team.deleteMany();
+    // await prisma.refreshToken.deleteMany();
+    // await prisma.notification.deleteMany();
+    // await prisma.notificationPreference.deleteMany();
     // RBAC clean up – order matters (junction tables first)
-    await prisma.userRoleAssignment.deleteMany();
-    await prisma.rolePermission.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.permission.deleteMany();
-    await prisma.role.deleteMany();
-    await prisma.tag.deleteMany();
-    console.log('Cleaned up existing data.');
+    // await prisma.userRoleAssignment.deleteMany();
+    // await prisma.rolePermission.deleteMany();
+    // await prisma.user.deleteMany();
+    // await prisma.permission.deleteMany();
+    // await prisma.role.deleteMany();
+    // await prisma.tag.deleteMany();
+    // console.log('Cleaned up existing data.');
 
     // -------------------------------------------------------
     // 2. SEED PERMISSIONS (upsert by id)
